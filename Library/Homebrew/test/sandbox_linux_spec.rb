@@ -202,6 +202,12 @@ RSpec.describe Sandbox, :needs_linux do
       expect(args.index("--ro-bind")).to be < args.index("--dev")
     end
 
+    it "masks denied read directories" do
+      sandbox.deny_read_path dir
+
+      expect(args.each_cons(2)).to include(["--tmpfs", dir.to_s])
+    end
+
     it "overlays Linux runtime filesystems" do
       expect(args.each_cons(2)).to include(["--dev", "/dev"], ["--proc", "/proc"])
     end

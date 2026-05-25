@@ -98,6 +98,11 @@ class Sandbox
   sig { returns(T::Array[String]) }
   def self.configuration_command_messages = []
 
+  sig { returns(T::Boolean) }
+  def self.deny_read_supported?
+    false
+  end
+
   sig { void }
   def self.configure!
     ensure_sandbox_installed!
@@ -175,6 +180,28 @@ class Sandbox
   sig { params(path: T.any(String, Pathname), type: Symbol).void }
   def allow_read(path:, type: :literal)
     add_rule allow: true, operation: "file-read*", filter: path_filter(path, type)
+  end
+
+  sig { params(path: T.any(String, Pathname), type: Symbol).void }
+  def deny_read(path:, type: :literal)
+    add_rule allow: false, operation: "file-read*", filter: path_filter(path, type)
+  end
+
+  sig { params(path: T.any(String, Pathname)).void }
+  def deny_read_path(path)
+    deny_read path:, type: :subpath
+  end
+
+  sig { void }
+  def deny_read_home
+    return unless self.class.deny_read_supported?
+
+    home = Pathname(Dir.home(ENV.fetch("USER"))).realpath
+    return if [HOMEBREW_TEMP, HOMEBREW_CACHE, HOMEBREW_LOGS].any? do |path|
+      (path.exist? ? path.realpath : path.expand_path).ascend.include?(home)
+    end
+
+    deny_read_path home
   end
 
   sig { params(path: T.nilable(T.any(String, Pathname)), type: Symbol).void }

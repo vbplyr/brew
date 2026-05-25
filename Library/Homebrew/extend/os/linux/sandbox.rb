@@ -239,6 +239,11 @@ module OS
           TIOCSCTTY
         end
 
+        sig { returns(T::Boolean) }
+        def deny_read_supported?
+          true
+        end
+
         private
 
         sig { returns(Symbol) }
@@ -328,6 +333,16 @@ module OS
           args += ["--ro-bind", path, path]
         end
 
+        denied_read_paths.each do |path|
+          next unless File.exist?(path)
+
+          args += if File.directory?(path)
+            ["--tmpfs", path]
+          else
+            ["--ro-bind", File::NULL, path]
+          end
+        end
+
         args += ["--bind", tmpdir, tmpdir, "--chdir", tmpdir]
 
         args
@@ -361,6 +376,16 @@ module OS
       def denied_write_paths
         profile.rules.filter_map do |rule|
           next if rule.allow || !rule.operation.start_with?("file-write")
+
+          filter = rule.filter
+          filter.path if filter && [:literal, :subpath].include?(filter.type)
+        end.uniq
+      end
+
+      sig { returns(T::Array[String]) }
+      def denied_read_paths
+        profile.rules.filter_map do |rule|
+          next if rule.allow || !rule.operation.start_with?("file-read")
 
           filter = rule.filter
           filter.path if filter && [:literal, :subpath].include?(filter.type)

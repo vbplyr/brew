@@ -143,6 +143,52 @@ RSpec.describe Sandbox do
     end
   end
 
+  describe "#deny_read_path" do
+    it "denies reads for a subpath" do
+      dir = mktmpdir/"foo"
+      dir.mkpath
+
+      sandbox.deny_read_path dir
+
+      rule = sandbox.send(:profile).rules.fetch(-1)
+      expect(rule).to have_attributes(allow: false, operation: "file-read*")
+      expect(rule.filter).to have_attributes(path: dir.realpath.to_s, type: :subpath)
+    end
+  end
+
+  describe "#deny_read_home" do
+    let(:home) { mktmpdir/"home" }
+    let(:temp) { mktmpdir/"tmp" }
+    let(:cache) { mktmpdir/"cache" }
+    let(:logs) { mktmpdir/"logs" }
+
+    before do
+      [home, temp, cache, logs].each(&:mkpath)
+      allow(klass).to receive(:deny_read_supported?).and_return(true)
+      allow(Dir).to receive(:home).with(ENV.fetch("USER")).and_return(home.to_s)
+      stub_const("HOMEBREW_TEMP", temp)
+      stub_const("HOMEBREW_CACHE", cache)
+      stub_const("HOMEBREW_LOGS", logs)
+    end
+
+    it "denies reads from the real home" do
+      sandbox.deny_read_home
+
+      rule = sandbox.send(:profile).rules.fetch(-1)
+      expect(rule).to have_attributes(allow: false, operation: "file-read*")
+      expect(rule.filter).to have_attributes(path: home.realpath.to_s, type: :subpath)
+    end
+
+    it "skips the deny when Homebrew temp is inside the real home" do
+      stub_const("HOMEBREW_TEMP", home/"tmp")
+      HOMEBREW_TEMP.mkpath
+
+      sandbox.deny_read_home
+
+      expect(sandbox.send(:profile).rules).to be_empty
+    end
+  end
+
   describe "#allow_write_path_if_exists" do
     it "allows writes for existing paths" do
       dir = mktmpdir/"foo"

@@ -71,6 +71,17 @@ module OS
         def terminal_ioctl_request
           TIOCSCTTY
         end
+
+        sig { returns(T::Boolean) }
+        def deny_read_supported?
+          system(
+            SANDBOX_EXEC,
+            "-p", '(version 1) (deny file-read* (subpath "/var/empty")) (allow default)',
+            "/usr/bin/true",
+            out: File::NULL,
+            err: File::NULL
+          ) == true
+        end
       end
 
       private
